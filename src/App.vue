@@ -1,5 +1,4 @@
-<script setup>
-import { supabase } from '../utils/supabase'
+<script setup lang="ts">
 import { useAuth } from './composables/useAuth';
 const { initAuth } = useAuth();
 initAuth()
