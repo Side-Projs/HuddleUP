@@ -1,0 +1,8 @@
+Profile avatars in this folder were generated with DiceBear (https://www.dicebear.com).
+
+character-*.svg — "Notionists" by Zoish (https://heyzoish.gumroad.com/l/notionists), CC0 1.0
+
+CC0 1.0 (public domain): https://creativecommons.org/publicdomain/zero/1.0/
+No attribution is required; this note is kept for reference. License metadata is also embedded in each SVG.
+
+The set is balanced: 8 feminine and 8 masculine characters, alternating (odd = feminine, even = masculine).
