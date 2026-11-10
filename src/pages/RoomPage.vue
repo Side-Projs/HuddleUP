@@ -342,16 +342,22 @@ const handleLeaveRoom = async () => {
   router.push('/main')
 }
 
+// Delete room: confirmed in an in-app dialog (the browser's confirm() can be
+// silently suppressed if the user ticks "prevent this page from creating dialogs")
+const showDeleteRoom = ref(false)
+const isDeletingRoom = ref(false)
+
 const handleDeleteRoom = async () => {
   if (!room.value) return
-  const confirmed = window.confirm('Delete this room and all tasks permanently? This cannot be undone.')
-  if (!confirmed) return
-
+  isDeletingRoom.value = true
   const success = await deleteRoom(room.value.room_id)
+  isDeletingRoom.value = false
+
   if (!success) {
     toast.add({ severity: 'error', summary: 'Error', detail: error.value || 'Failed to delete room.', life: 3000 })
     return
   }
+  showDeleteRoom.value = false
   toast.add({ severity: 'success', summary: 'Deleted', detail: 'Room and all tasks were removed.', life: 3000 })
   router.push('/main')
 }
@@ -453,7 +459,7 @@ watch(
           </button>
           <span class="sr-only" aria-live="polite">{{ copied ? 'Room code copied to clipboard' : '' }}</span>
 
-          <Button v-if="isAdmin" icon="pi pi-trash" severity="danger" text rounded @click="handleDeleteRoom" title="Delete Room" aria-label="Delete Room" />
+          <Button v-if="isAdmin" icon="pi pi-trash" severity="danger" text rounded @click="showDeleteRoom = true" title="Delete Room" aria-label="Delete Room" />
           <Button v-else icon="pi pi-sign-out" severity="secondary" text rounded @click="handleLeaveRoom" title="Leave Room" aria-label="Leave Room" />
         </div>
       </div>
@@ -717,6 +723,34 @@ watch(
           <Button label="Cancel" text severity="secondary" @click="showEditTask = false" />
           <Button label="Save Changes" :loading="isSubmitting" @click="handleEditTask" />
         </div>
+      </div>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="showDeleteRoom"
+      header="Delete room?"
+      modal
+      :closable="!isDeletingRoom"
+      :style="{ width: '420px' }"
+      :breakpoints="{ '480px': '92vw' }"
+    >
+      <div class="delete-room">
+        <span class="delete-room__icon" aria-hidden="true"><i class="pi pi-exclamation-triangle" /></span>
+        <div>
+          <p class="delete-room__question">
+            Delete this room and all tasks permanently? This cannot be undone.
+          </p>
+          <p class="delete-room__detail">
+            <strong>{{ room?.title }}</strong> will be removed for everyone, along with
+            {{ assignedTasks.length }} {{ assignedTasks.length === 1 ? 'task' : 'tasks' }} and
+            {{ members.length }} {{ members.length === 1 ? "member's" : "members'" }} progress.
+          </p>
+        </div>
+      </div>
+      <div class="dialog-actions mt-3 flex justify-end">
+        <!-- Cancel gets focus first, so pressing Enter by accident doesn't delete -->
+        <Button label="Cancel" text severity="secondary" autofocus :disabled="isDeletingRoom" @click="showDeleteRoom = false" />
+        <Button label="Delete room" icon="pi pi-trash" severity="danger" :loading="isDeletingRoom" @click="handleDeleteRoom" />
       </div>
     </Dialog>
 
@@ -1812,5 +1846,38 @@ watch(
     animation: none;
     box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18), var(--hu-shadow);
   }
+}
+
+/* ══ Delete room confirmation ═══════════════════════════════════════════════ */
+.delete-room {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.delete-room__icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 1.1rem;
+}
+
+.delete-room__question {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--hu-text);
+}
+
+.delete-room__detail {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--hu-text-muted);
 }
 </style>
