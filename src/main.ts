@@ -27,15 +27,16 @@ const MyTheme = definePreset(Aura, {
     },
     colorScheme: {
       light: {
+        // Matches --hu-green (#6a9c39) in App.vue so PrimeVue buttons and the app use one green
         primary: {
-          color: '{primary.500}',
+          color: '{primary.600}',
           contrastColor: '#ffffff',
-          hoverColor: '{primary.600}',
-          activeColor: '{primary.700}'
+          hoverColor: '{primary.700}',
+          activeColor: '{primary.800}'
         },
         highlight: {
-          background: '{primary.500}',
-          focusBackground: '{primary.600}',
+          background: '{primary.600}',
+          focusBackground: '{primary.700}',
           color: '#ffffff',
           focusColor: '#ffffff'
         },
@@ -55,9 +56,10 @@ const MyTheme = definePreset(Aura, {
         },
         formField: {
           background: '#ffffff',
-          borderColor: 'transparent',
-          hoverBorderColor: 'rgba(255, 255, 255, 0.4)',
-          focusBorderColor: 'rgba(255, 255, 255, 0.8)',
+          // Visible on white dialogs; the login/signup inputs remove their border in AuthLayout.vue
+          borderColor: '{surface.300}',
+          hoverBorderColor: '{surface.400}',
+          focusBorderColor: '{primary.color}',
           color: '{surface.900}',
           placeholderColor: '{surface.400}'
         }
@@ -102,8 +104,9 @@ const MyTheme = definePreset(Aura, {
     focusRing: {
       width: '2px',
       style: 'solid',
-      color: 'rgba(255, 255, 255, 0.6)',
-      offset: '0',
+      // Was white (invisible on white dialogs); brand blue shows on both white and green
+      color: '#3571cb',
+      offset: '2px',
       shadow: 'none'
     }
   },

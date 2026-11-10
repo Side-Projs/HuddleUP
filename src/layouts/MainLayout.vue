@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRooms } from '@/composables/useRooms'
 
 import EditProfile from '@/pages/EditProfile.vue'
 
 import 'primeicons/primeicons.css'
-import Avatar from 'primevue/avatar'
+import UserAvatar from '@/components/UserAvatar.vue'
 import Button from 'primevue/button'
 
 const router = useRouter()
+const route = useRoute()
 const { user, signOut } = useAuth()
-const { createdRooms, joinedRooms, fetchCreatedRooms, fetchJoinedRooms, subscribeToRooms } = useRooms()
+const { createdRooms, joinedRooms, fetchCreatedRooms, fetchJoinedRooms, subscribeToRooms, unsubscribeFromRooms } = useRooms()
 
 const showEditProfile = ref(false)
 const showSettingsMenu = ref(false)
 const settingsMenuRef = ref<HTMLElement | null>(null)
+
+// Mobile: the sidebar becomes a slide-in drawer, closed on every navigation
+const sidebarOpen = ref(false)
+watch(() => route.fullPath, () => { sidebarOpen.value = false })
 
 onMounted(async () => {
   subscribeToRooms()
@@ -27,6 +32,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick)
+  unsubscribeFromRooms()
 })
 
 const handleOutsideClick = (e: MouseEvent) => {
@@ -36,7 +42,11 @@ const handleOutsideClick = (e: MouseEvent) => {
 }
 
 const handleSignOut = async () => {
-  await signOut()
+  try {
+    await signOut()
+  } catch (e) {
+    console.error('Sign out failed:', e)
+  }
   router.push('/login')
 }
 
@@ -51,68 +61,64 @@ const username = computed(() => {
 </script>
 
 <template>
-  <div class="main-layout">
+  <div class="main-layout" :class="{ 'sidebar-open': sidebarOpen }">
     <EditProfile v-model:visible="showEditProfile" />
 
-    <aside class="sidebar">
-      <div class="sidebar-logo">
-        <img src="/your-photo.png" alt="HuddleUp Logo" class="logo-icon" />
-        <span class="logo-text">HuddleUp</span>
-      </div>
+    <div class="sidebar-backdrop" @click="sidebarOpen = false" />
 
-      <div class="user-card-container">
-        <div class="user-card">
-          <Avatar icon="pi pi-user" size="large" shape="circle" class="user-avatar" />
-          <div class="user-info">
-            <span class="user-name">{{ username }}</span>
-            <span class="user-email">{{ user?.email || 'Loading...' }}</span>
-          </div>
+    <aside class="sidebar" aria-label="Sidebar">
+      <RouterLink to="/main/dashboard" class="sidebar-logo">
+        <span class="logo-chip"><img src="/HuddleUP Logo.svg" alt="" class="logo-icon" /></span>
+        <span class="logo-text">HuddleUP</span>
+      </RouterLink>
+
+      <div class="user-card">
+        <UserAvatar :avatar="user?.user_metadata?.avatar" :name="username" :size="44" class="user-avatar" />
+        <div class="user-info">
+          <span class="user-name">{{ username }}</span>
+          <span class="user-email">{{ user?.email || 'Loading...' }}</span>
         </div>
       </div>
 
-      <nav class="sidebar-nav">
-        <p class="nav-section-label">NAVIGATION</p>
-        <div
-          class="nav-item"
-          :class="{ active: $route.path === '/main/dashboard' }"
-          @click="router.push('/main/dashboard')"
-        >
-          <i class="pi pi-home" />
-          <span>Dashboard</span>
-        </div>
-      </nav>
+      <div class="sidebar-scroll">
+        <nav class="sidebar-nav" aria-label="Navigation">
+          <p class="nav-section-label">Navigation</p>
+          <RouterLink to="/main/dashboard" class="nav-item" active-class="active">
+            <i class="pi pi-home" />
+            <span>Dashboard</span>
+          </RouterLink>
+        </nav>
 
-      <nav class="sidebar-nav">
-        <p class="nav-section-label">JOINED ROOMS</p>
-        <p v-if="!joinedRooms.length" class="nav-empty">Join a room and start huddling!</p>
-        <div
-          v-for="room in joinedRooms"
-          :key="room.room_id"
-          class="nav-item"
-          :class="{ active: $route.params.roomCode === room.room_code }"
-          @click="router.push(`/main/rooms/${room.room_code}`)"
-        >
-          <i class="pi pi-users" />
-          <span>{{ room.title }}</span>
-        </div>
-      </nav>
+        <nav class="sidebar-nav" aria-label="Joined rooms">
+          <p class="nav-section-label">Joined Rooms</p>
+          <p v-if="!joinedRooms.length" class="nav-empty">Join a room and start huddling!</p>
+          <RouterLink
+            v-for="room in joinedRooms"
+            :key="room.room_id"
+            :to="`/main/rooms/${room.room_code}`"
+            class="nav-item"
+            active-class="active"
+          >
+            <i class="pi pi-users" />
+            <span>{{ room.title }}</span>
+          </RouterLink>
+        </nav>
 
-      <nav class="sidebar-nav">
-        <p class="nav-section-label">CREATED ROOMS</p>
-        <p v-if="!createdRooms.length" class="nav-empty">Create a room and start the huddle!</p>
-        <div
-          v-for="room in createdRooms"
-          :key="room.room_id"
-          class="nav-item"
-          :class="{ active: $route.params.roomCode === room.room_code }"
-          @click="router.push(`/main/rooms/${room.room_code}`)"
-        >
-          <i class="pi pi-folder" />
-          <span>{{ room.title }}</span>
-        </div>
-      </nav>
-
-      <div class="sidebar-spacer" />
+        <nav class="sidebar-nav" aria-label="Created rooms">
+          <p class="nav-section-label">Created Rooms</p>
+          <p v-if="!createdRooms.length" class="nav-empty">Create a room and start the huddle!</p>
+          <RouterLink
+            v-for="room in createdRooms"
+            :key="room.room_id"
+            :to="`/main/rooms/${room.room_code}`"
+            class="nav-item"
+            active-class="active"
+          >
+            <i class="pi pi-folder" />
+            <span>{{ room.title }}</span>
+          </RouterLink>
+        </nav>
+      </div>
 
       <div class="sidebar-bottom">
         <Button
@@ -129,30 +135,51 @@ const username = computed(() => {
     </aside>
 
     <div class="content-container">
-      <!-- Top bar with settings -->
-      <div class="topbar">
+      <header class="topbar">
+        <button
+          class="icon-btn menu-btn"
+          aria-label="Open menu"
+          :aria-expanded="sidebarOpen"
+          @click="sidebarOpen = true"
+        >
+          <i class="pi pi-bars" />
+        </button>
+
+        <RouterLink to="/main/dashboard" class="topbar-brand">
+          <img src="/HuddleUP Logo.svg" alt="" />
+          <span>HuddleUP</span>
+        </RouterLink>
+
         <div class="topbar-right" ref="settingsMenuRef">
-          <button class="settings-btn" @click.stop="showSettingsMenu = !showSettingsMenu">
+          <button
+            class="icon-btn"
+            aria-label="Settings"
+            aria-haspopup="menu"
+            :aria-expanded="showSettingsMenu"
+            @click.stop="showSettingsMenu = !showSettingsMenu"
+          >
             <i class="pi pi-cog" />
           </button>
 
           <transition name="menu-fade">
-            <div v-if="showSettingsMenu" class="settings-menu">
-              <button class="menu-item" @click="openEditProfile">
+            <div v-if="showSettingsMenu" class="settings-menu" role="menu">
+              <button class="menu-item" role="menuitem" @click="openEditProfile">
                 <i class="pi pi-user-edit" />
                 <span>Edit Profile</span>
               </button>
               <div class="menu-divider" />
-              <button class="menu-item danger" @click="handleSignOut">
+              <button class="menu-item danger" role="menuitem" @click="handleSignOut">
                 <i class="pi pi-sign-out" />
                 <span>Log Out</span>
               </button>
             </div>
           </transition>
         </div>
-      </div>
+      </header>
 
-      <RouterView />
+      <main class="content-main">
+        <RouterView />
+      </main>
     </div>
   </div>
 </template>
@@ -161,228 +188,276 @@ const username = computed(() => {
 .main-layout {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ── Sidebar ── */
 .sidebar {
-  width: 300px;
-  min-height: 100vh;
-  background: #3a72d4;
+  position: sticky;
+  top: 0;
+  width: 280px;
+  height: 100vh;
+  height: 100dvh;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  gap: 1rem;
   padding: 1.25rem 1rem;
-  gap: 0.25rem;
-  flex-shrink: 0;
+  color: #ffffff;
+  /* Same square dot grid as the login/signup panel */
+  background:
+    conic-gradient(at 3px 3px, transparent 75%, var(--hu-dot-on-blue) 0) 0 0 / 22px 22px,
+    var(--hu-blue);
 }
 
-/* Logo */
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.75rem 1.25rem;
+  gap: 0.65rem;
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+}
+
+.logo-chip {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
+  background: #ffffff;
 }
 
 .logo-icon {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.7rem;
+  height: 1.7rem;
   object-fit: contain;
 }
 
 .logo-text {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: #ffffff;
-  letter-spacing: -0.01em;
 }
 
-/* User Card */
-.user-card-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-
+/* User card */
 .user-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: rgba(255, 255, 255, 0.18);
+  padding: 0.75rem 0.9rem;
   border-radius: 14px;
-  padding: 0.75rem 1rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .user-avatar {
-  background: #6b9fe8 !important;
-  color: #fff !important;
-  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+.user-name,
+.user-email {
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-name {
   font-weight: 700;
   font-size: 0.95rem;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .user-email {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.75);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-/* Nav sections */
+/* Nav (scrolls on its own when there are many rooms) */
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  margin-bottom: 0.5rem;
+  gap: 0.15rem;
+  margin-bottom: 0.75rem;
 }
 
 .nav-section-label {
+  margin: 0.5rem 0.75rem 0.35rem;
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.65);
-  margin: 0.5rem 0.75rem 0.4rem;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .nav-empty {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.5);
   margin: 0 0.75rem 0.25rem;
+  font-size: 0.8rem;
   font-style: italic;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.55rem 0.75rem;
+  padding: 0.6rem 0.75rem;
   border-radius: 10px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
   font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.nav-item span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
 }
 
+.nav-item:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+}
+
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.24);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .nav-item i {
   font-size: 0.9rem;
-  opacity: 0.85;
+  flex-shrink: 0;
 }
 
-/* Spacer */
-.sidebar-spacer {
-  flex: 1;
-}
-
-/* Bottom Buttons */
+/* Bottom buttons */
 .sidebar-bottom {
   display: flex;
-  flex-direction: row;
-  gap: 0.6rem;
-  padding: 0.75rem 0 0.25rem;
+  gap: 0.5rem;
 }
 
-.btn-create,
-.btn-join {
+.btn-create.p-button,
+.btn-join.p-button {
   flex: 1;
-  border-radius: 999px !important;
-  font-weight: 600 !important;
-  font-size: 0.82rem !important;
-  padding: 0.55rem 0.5rem !important;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border-radius: 999px;
 }
 
-.btn-create {
-  background: #4279cc !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.35) !important;
-  color: #ffffff !important;
+.btn-create.p-button {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #ffffff;
 }
 
-.btn-create:hover {
-  background: #3569bc !important;
+.btn-create.p-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: #ffffff;
+  color: #ffffff;
 }
 
-.btn-join {
-  background: #7e9e34 !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  color: #ffffff !important;
+.btn-join.p-button {
+  background: var(--hu-green);
+  border: 1px solid var(--hu-green);
+  color: #ffffff;
 }
 
-.btn-join:hover {
-  background: #6e8e24 !important;
+.btn-join.p-button:not(:disabled):hover {
+  background: var(--hu-green-700);
+  border-color: var(--hu-green-700);
+  color: #ffffff;
 }
 
 /* ── Content ── */
 .content-container {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
-  overflow-y: auto;
+  background: var(--hu-bg);
+}
+
+.content-main {
+  flex: 1;
 }
 
 /* ── Topbar ── */
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  gap: 0.75rem;
   padding: 0.75rem 1.5rem;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--hu-border);
 }
 
 .topbar-right {
   position: relative;
+  margin-left: auto;
 }
 
-.settings-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--hu-border);
   background: #ffffff;
-  color: #6b7280;
-  cursor: pointer;
+  color: var(--hu-text-muted);
   font-size: 1rem;
-  transition: all 0.15s ease;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.settings-btn:hover {
-  background: #f3f4f6;
-  color: #3a72d4;
-  border-color: #d1d5db;
+.icon-btn:hover {
+  background: var(--hu-blue-soft);
+  color: var(--hu-blue);
+}
+
+.menu-btn,
+.topbar-brand {
+  display: none;
+}
+
+.topbar-brand {
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--hu-text);
+  text-decoration: none;
+}
+
+.topbar-brand img {
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 /* Dropdown menu */
@@ -390,12 +465,12 @@ const username = computed(() => {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   min-width: 170px;
   padding: 0.4rem;
+  background: #ffffff;
+  border: 1px solid var(--hu-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   z-index: 100;
 }
 
@@ -405,21 +480,20 @@ const username = computed(() => {
   gap: 0.6rem;
   width: 100%;
   padding: 0.55rem 0.75rem;
-  border-radius: 8px;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: #374151;
+  font: inherit;
   font-size: 0.875rem;
   font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
   text-align: left;
+  cursor: pointer;
 }
 
 .menu-item:hover {
-  background: #f3f4f6;
-  color: #3a72d4;
+  background: var(--hu-blue-soft);
+  color: var(--hu-blue);
 }
 
 .menu-item.danger:hover {
@@ -427,18 +501,12 @@ const username = computed(() => {
   color: #dc2626;
 }
 
-.menu-item i {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
 .menu-divider {
   height: 1px;
-  background: #e5e7eb;
   margin: 0.3rem 0;
+  background: var(--hu-border);
 }
 
-/* Menu animation */
 .menu-fade-enter-active,
 .menu-fade-leave-active {
   transition: opacity 0.15s ease, transform 0.15s ease;
@@ -448,5 +516,54 @@ const username = computed(() => {
 .menu-fade-leave-to {
   opacity: 0;
   transform: translateY(-6px);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ── Tablet & phone: sidebar becomes a drawer ── */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    z-index: 60;
+    width: min(300px, 85vw);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.2);
+  }
+
+  .sidebar-open .sidebar {
+    transform: none;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .sidebar-open .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .menu-btn {
+    display: grid;
+  }
+
+  .topbar-brand {
+    display: flex;
+  }
+
+  .topbar {
+    padding: 0.6rem 1rem;
+  }
 }
 </style>

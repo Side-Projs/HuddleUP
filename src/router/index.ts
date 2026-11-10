@@ -6,13 +6,22 @@ import MainLayout from '@/layouts/MainLayout.vue'
 
 
 const routes = [
+  // Public landing page. Listed before the auth layout so it wins the '/' match.
+  { path: '/', component: () => import('../pages/LandingPage.vue'), meta: { guestOnly: true } },
   {
     path: '/',
     component: AuthLayout,        // ← layout wraps the children
     children: [
-      { path: '', redirect: '/login' },
-      { path: 'login', component: () => import('../pages/LoginPage.vue') },
-      { path: 'signup', component: () => import('../pages/SignupPage.vue') },
+      {
+        path: 'login',
+        component: () => import('../pages/LoginPage.vue'),
+        meta: { guestOnly: true, illustration: '/login.png', illustrationAlt: 'Team collaborating around a table' }
+      },
+      {
+        path: 'signup',
+        component: () => import('../pages/SignupPage.vue'),
+        meta: { guestOnly: true, illustration: '/signup.png', illustrationAlt: 'Team sharing a creative idea' }
+      },
     ]
   },
   {
@@ -24,8 +33,10 @@ const routes = [
       { path: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta: { requiresAuth: true }},
       { path: 'rooms/:roomCode', component: () => import('../pages/RoomPage.vue'), meta: { requiresAuth: true }}
     ]
-  }
+  },
 
+  // Any unknown URL used to render a blank page; send it home instead
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({
@@ -38,8 +49,8 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.meta.requiresAuth && !session) {
     next('/login')
-  } else if (to.path === '/login' && session) {
-    next('/main') // redirect logged-in users away from login
+  } else if (to.meta.guestOnly && session) {
+    next('/main') // logged-in users skip the landing, login and signup pages
   } else {
     next()
   }
