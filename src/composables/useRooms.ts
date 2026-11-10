@@ -10,11 +10,21 @@ export interface RoomData {
   room_creator_id: string
   closed_at: string | null
   room_created_at: string
+  description?: string | null
   // NEW: Added this so TypeScript knows rooms can have members
   members?: { user_id: string }[]
 }
 
 const { user } = useAuth()
+
+// 6 characters, no look-alikes (0/O, 1/I) so codes are easy to read out loud.
+// Exactly 32 symbols, which divides 256 evenly, so every character is equally likely.
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const makeRoomCode = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => CODE_CHARS[b % 32]).join('')
+
+let roomsChannel: ReturnType<typeof supabase.channel> | null = null
+
 const createdRooms = ref<RoomData[]>([])
 const joinedRooms = ref<RoomData[]>([])
 const isLoading = ref(false)
@@ -79,28 +89,34 @@ export function useRooms() {
   }
 
   // Create new room
-  const createRoom = async (title: string) => {
+  const createRoom = async (title: string, description = '') => {
     if (!user.value) return null
     isLoading.value = true
     error.value = null
 
-    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const insertRoom = () =>
+      supabase
+        .from('Room')
+        .insert([
+          {
+            title: title,
+            ...(description.trim() ? { description: description.trim() } : {}),
+            room_code: makeRoomCode(),
+            room_creator_id: user.value!.id,
+            status_room: 'active',
+          },
+        ])
+        .select()
+        .single()
 
-    const { data: roomData, error: roomError } = await supabase
-      .from('Room')
-      .insert([
-        {
-          title: title,
-          room_code: roomCode,
-          room_creator_id: user.value.id,
-          status_room: 'active',
-        },
-      ])
-      .select()
-      .single()
+    // Retry with a fresh code if it collides with an existing one (23505 = unique violation)
+    let { data: roomData, error: roomError } = await insertRoom()
+    for (let i = 0; i < 3 && roomError?.code === '23505'; i++) {
+      ;({ data: roomData, error: roomError } = await insertRoom())
+    }
 
-    if (roomError) {
-      error.value = roomError.message
+    if (roomError || !roomData) {
+      error.value = roomError?.message || 'Could not create the room.'
       isLoading.value = false
       return null
     }
@@ -288,8 +304,16 @@ export function useRooms() {
     return true
   }
 
+  const unsubscribeFromRooms = () => {
+    if (roomsChannel) {
+      supabase.removeChannel(roomsChannel)
+      roomsChannel = null
+    }
+  }
+
   const subscribeToRooms = () => {
-    supabase
+    unsubscribeFromRooms()
+    roomsChannel = supabase
       .channel('room-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'Room' }, () => {
         fetchCreatedRooms()
@@ -310,5 +334,6 @@ export function useRooms() {
     leaveRoom,
     deleteRoom,
     subscribeToRooms,
+    unsubscribeFromRooms,
   }
 }
