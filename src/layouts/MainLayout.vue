@@ -8,12 +8,13 @@ import EditProfile from '@/pages/EditProfile.vue'
 
 import 'primeicons/primeicons.css'
 import UserAvatar from '@/components/UserAvatar.vue'
+import SortableRoomList from '@/components/SortableRoomList.vue'
 import Button from 'primevue/button'
 
 const router = useRouter()
 const route = useRoute()
 const { user, signOut } = useAuth()
-const { createdRooms, joinedRooms, fetchCreatedRooms, fetchJoinedRooms, subscribeToRooms, unsubscribeFromRooms } = useRooms()
+const { createdRooms, joinedRooms, fetchCreatedRooms, fetchJoinedRooms, subscribeToRooms, unsubscribeFromRooms, moveRoom } = useRooms()
 
 const showEditProfile = ref(false)
 const showSettingsMenu = ref(false)
@@ -92,31 +93,23 @@ const username = computed(() => {
         <nav class="sidebar-nav" aria-label="Joined rooms">
           <p class="nav-section-label">Joined Rooms</p>
           <p v-if="!joinedRooms.length" class="nav-empty">Join a room and start huddling!</p>
-          <RouterLink
-            v-for="room in joinedRooms"
-            :key="room.room_id"
-            :to="`/main/rooms/${room.room_code}`"
-            class="nav-item"
-            active-class="active"
-          >
-            <i class="pi pi-users" />
-            <span>{{ room.title }}</span>
-          </RouterLink>
+          <SortableRoomList
+            :rooms="joinedRooms"
+            icon="pi pi-users"
+            label="Joined rooms, drag to reorder"
+            @move="(from, to) => moveRoom('joined', from, to)"
+          />
         </nav>
 
         <nav class="sidebar-nav" aria-label="Created rooms">
           <p class="nav-section-label">Created Rooms</p>
           <p v-if="!createdRooms.length" class="nav-empty">Create a room and start the huddle!</p>
-          <RouterLink
-            v-for="room in createdRooms"
-            :key="room.room_id"
-            :to="`/main/rooms/${room.room_code}`"
-            class="nav-item"
-            active-class="active"
-          >
-            <i class="pi pi-folder" />
-            <span>{{ room.title }}</span>
-          </RouterLink>
+          <SortableRoomList
+            :rooms="createdRooms"
+            icon="pi pi-folder"
+            label="Created rooms, drag to reorder"
+            @move="(from, to) => moveRoom('created', from, to)"
+          />
         </nav>
       </div>
 
@@ -310,7 +303,7 @@ const username = computed(() => {
   color: rgba(255, 255, 255, 0.7);
 }
 
-.nav-item {
+.sidebar-nav :deep(.nav-item) {
   display: flex;
   align-items: center;
   gap: 0.65rem;
@@ -323,29 +316,29 @@ const username = computed(() => {
   transition: background 0.15s ease;
 }
 
-.nav-item span {
+.sidebar-nav :deep(.nav-item span) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.nav-item:hover {
+.sidebar-nav :deep(.nav-item:hover) {
   background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
 }
 
-.nav-item:focus-visible {
+.sidebar-nav :deep(.nav-item:focus-visible) {
   outline: 2px solid #ffffff;
   outline-offset: -2px;
 }
 
-.nav-item.active {
+.sidebar-nav :deep(.nav-item.active) {
   background: rgba(255, 255, 255, 0.24);
   color: #ffffff;
   font-weight: 700;
 }
 
-.nav-item i {
+.sidebar-nav :deep(.nav-item i) {
   font-size: 0.9rem;
   flex-shrink: 0;
 }
