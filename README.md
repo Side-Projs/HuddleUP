@@ -162,8 +162,14 @@ The live site deploys from `main` on Vercel:
 
 `vercel.json` sends every path to `index.html`, so refreshing on a page like `/main/dashboard` works.
 
+## Team
+
+- Russel Niño Buno
+- Kyle Casirayan
+- Feahmar Bentazal
+- CJ Clarence Retiza
+
 ## Credits
 
 - Profile avatars: [Notionists](https://heyzoish.gumroad.com/l/notionists) by Zoish, generated with [DiceBear](https://www.dicebear.com/). Licensed **CC0 1.0** (see `public/avatars/LICENSE.txt`).
 - Icons: [PrimeIcons](https://primevue.org/icons/).
-- Built by the HuddleUP team. See the [contributors](https://github.com/Side-Projs/HuddleUP/graphs/contributors).
