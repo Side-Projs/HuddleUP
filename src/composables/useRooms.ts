@@ -25,6 +25,30 @@ const makeRoomCode = () =>
 
 let roomsChannel: ReturnType<typeof supabase.channel> | null = null
 
+// ── Personal room order ("prioritize" by dragging in the sidebar) ──────────
+// Saved per user in auth user_metadata.room_order = { created: [ids], joined: [ids] },
+// so it follows you across devices without any database changes.
+export type RoomListKind = 'created' | 'joined'
+
+// Order changed in this session but maybe not saved yet (wins over user_metadata)
+let localOrder: { userId?: string; created?: string[]; joined?: string[] } = {}
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+
+const savedOrder = (kind: RoomListKind): string[] => {
+  if (localOrder.userId === user.value?.id && localOrder[kind]) return localOrder[kind]!
+  const stored = user.value?.user_metadata?.room_order?.[kind]
+  return Array.isArray(stored) ? stored : []
+}
+
+/** Sort rooms by the user's saved order; rooms not in it (new ones) go to the bottom. */
+const applySavedOrder = (rooms: RoomData[], kind: RoomListKind): RoomData[] => {
+  const rank = new Map(savedOrder(kind).map((id, i) => [id, i]))
+  return rooms
+    .map((room, i) => ({ room, r: rank.get(room.room_id) ?? rank.size + i }))
+    .sort((a, b) => a.r - b.r)
+    .map((x) => x.room)
+}
+
 const createdRooms = ref<RoomData[]>([])
 const joinedRooms = ref<RoomData[]>([])
 const isLoading = ref(false)
@@ -52,7 +76,7 @@ export function useRooms() {
       .eq('status_room', 'active')
 
     if (sbError) error.value = sbError.message
-    else createdRooms.value = data || []
+    else createdRooms.value = applySavedOrder(data || [], 'created')
 
     isLoading.value = false
   }
@@ -77,12 +101,15 @@ export function useRooms() {
     if (sbError) {
       error.value = sbError.message
     } else if (data) {
-      joinedRooms.value = data
-        .map((item: any) => item.Room)
-        .filter(
-          (room: RoomData) =>
-            room.status_room === 'active' && room.room_creator_id !== user.value?.id,
-        )
+      joinedRooms.value = applySavedOrder(
+        data
+          .map((item: any) => item.Room)
+          .filter(
+            (room: RoomData) =>
+              room.status_room === 'active' && room.room_creator_id !== user.value?.id,
+          ),
+        'joined',
+      )
     }
 
     isLoading.value = false
@@ -304,6 +331,31 @@ export function useRooms() {
     return true
   }
 
+  /** Move a room within its list (instant), then save the new order shortly after. */
+  const moveRoom = (kind: RoomListKind, from: number, to: number) => {
+    const list = kind === 'created' ? createdRooms : joinedRooms
+    if (from === to || from < 0 || to < 0 || from >= list.value.length || to >= list.value.length) return
+    const next = [...list.value]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved!)
+    list.value = next
+
+    localOrder = {
+      userId: user.value?.id,
+      created: createdRooms.value.map((r) => r.room_id),
+      joined: joinedRooms.value.map((r) => r.room_id),
+    }
+
+    // Debounced: dragging past several rooms makes one save, not many
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(async () => {
+      const { error: saveError } = await supabase.auth.updateUser({
+        data: { room_order: { created: localOrder.created, joined: localOrder.joined } },
+      })
+      if (saveError) console.error('Could not save room order:', saveError.message)
+    }, 700)
+  }
+
   const unsubscribeFromRooms = () => {
     if (roomsChannel) {
       supabase.removeChannel(roomsChannel)
@@ -335,5 +387,6 @@ export function useRooms() {
     deleteRoom,
     subscribeToRooms,
     unsubscribeFromRooms,
+    moveRoom,
   }
 }
